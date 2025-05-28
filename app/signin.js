@@ -1,16 +1,19 @@
 import { View, Text, Image, TextInput, TouchableOpacity, Pressable, Alert } from 'react-native';
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { StatusBar } from 'expo-status-bar';
 import { Octicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export default function SignIn() {
   const router = useRouter();
   const emailRef = useRef('');
   const passwordRef = useRef('');
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!emailRef.current || !passwordRef.current) {
@@ -19,21 +22,42 @@ export default function SignIn() {
     }
 
     try {
+      setLoading(true);
       const auth = getAuth();
       const userCredential = await signInWithEmailAndPassword(auth, emailRef.current, passwordRef.current);
       const user = userCredential.user;
 
-      // Save session to AsyncStorage
+      // Get user role from Firestore
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (!userDoc.exists()) {
+        throw new Error("User data not found. Please sign up again.");
+      }
+      
+      const userData = userDoc.data();
+      const userRole = userData.role || 'user'; // Default to user if role is not set
+      
+      // Save session to AsyncStorage with role
       await AsyncStorage.setItem('user', JSON.stringify({
         uid: user.uid,
         email: user.email,
+        role: userRole,
+        firstName: userData.firstName,
+        lastName: userData.lastName
       }));
 
+      // Route based on user role
+      if (userRole === 'physiotherapist') {
+        router.replace('/physioDashboard');
+      } else {
+        router.replace('/home');
+      }
+      
       Alert.alert('Success', 'Logged in successfully!');
-      router.replace('/home');
     } catch (error) {
       console.error('Login failed:', error);
       Alert.alert('Sign In Failed', error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -79,8 +103,15 @@ export default function SignIn() {
               </Text>
             </View>
 
-            <TouchableOpacity onPress={handleLogin} style={{ height: hp(6.5) }} className="bg-indigo-500 rounded-xl justify-center items-center">
-              <Text style={{ fontSize: hp(2.7) }} className="text-white font-bold tracking-wider">Sign In</Text>
+            <TouchableOpacity 
+              onPress={handleLogin} 
+              style={{ height: hp(6.5) }} 
+              className={`bg-indigo-500 rounded-xl justify-center items-center ${loading ? 'opacity-70' : ''}`}
+              disabled={loading}
+            >
+              <Text style={{ fontSize: hp(2.7) }} className="text-white font-bold tracking-wider">
+                {loading ? 'Signing In...' : 'Sign In'}
+              </Text>
             </TouchableOpacity>
 
             <View className="flex-row justify-center">

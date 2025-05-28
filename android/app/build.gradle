@@ -124,6 +124,10 @@ android {
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
     }
+    // force androidX
+    buildFeatures {
+        viewBinding true
+    }
 }
 
 // Apply static values from `gradle.properties` to the `android.packagingOptions`
@@ -145,8 +149,20 @@ android {
         }
     }
 }
-
+configurations.all {
+     resolutionStrategy {
+        force 'com.github.bumptech.glide:glide:4.14.2'
+    }
+    resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+        if (details.requested.group == 'com.android.support') {
+            throw new GradleException("Using old support libraries is not allowed: ${details.requested.name}")
+        }
+    }
+}
 dependencies {
+    implementation 'com.github.bumptech.glide:glide:4.14.2'
+annotationProcessor 'com.github.bumptech.glide:compiler:4.14.2'
+
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
